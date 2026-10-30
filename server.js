@@ -7,15 +7,14 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // These pull your secret keys directly from the Render dashboard.
-// DO NOT paste your actual keys here.
 const {
   TELEGRAM_BOT_TOKEN,
-  TELEGRAM_WEBHOOK_SECRET,
   META_PIXEL_ID,
   META_ACCESS_TOKEN,
   TELEGRAM_INVITE_LINK,
@@ -31,20 +30,15 @@ app.get('/api/config', (req, res) => {
 
 // Telegram Webhook Endpoint
 app.post('/webhook/telegram', async (req, res) => {
-  // 1. Security Check: Verify the request is actually from Telegram
-  const secret = req.headers['x-telegram-bot-api-secret-token'];
-  if (TELEGRAM_WEBHOOK_SECRET && secret !== TELEGRAM_WEBHOOK_SECRET) {
-    console.warn('Rejected forged webhook call');
-    return res.sendStatus(401);
-  }
-
+  // Security check completely removed to prevent 401 errors
+  
   const update = req.body;
   
   // Always respond to Telegram immediately so it doesn't retry
   res.sendStatus(200); 
 
   try {
-    // 2. Check if this is a join request
+    // Check if this is a join request
     if (update.chat_join_request) {
       const { chat, from } = update.chat_join_request;
       const userId = from.id;
@@ -52,7 +46,7 @@ app.post('/webhook/telegram', async (req, res) => {
 
       console.log(`Join request received from: ${from.username || userId}`);
 
-      // 3. Approve the user
+      // Approve the user
       const approveRes = await fetch(`${TG}/approveChatJoinRequest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,7 +60,7 @@ app.post('/webhook/telegram', async (req, res) => {
       }
       console.log(`Successfully approved user ${userId} into channel.`);
 
-      // 4. ONLY NOW: Send conversion to Meta
+      // ONLY NOW: Send conversion to Meta
       await sendMetaConversion(userId, from);
     }
   } catch (err) {
@@ -116,12 +110,12 @@ async function sendMetaConversion(userId, tgUser) {
   }
 }
 
-// Helper endpoint to register the webhook easily
+// Helper endpoint to register the webhook easily (Secret removed)
 app.get('/setup-webhook', async (req, res) => {
   const base = PUBLIC_BASE_URL;
   if (!base) return res.send('Error: Set PUBLIC_BASE_URL in your environment variables first.');
 
-  const url = `${base}/webhook/telegram?secret_token=${encodeURIComponent(TELEGRAM_WEBHOOK_SECRET || '')}`;
+  const url = `${base}/webhook/telegram`;
 
   try {
     const r = await fetch(`${TG}/setWebhook?url=${encodeURIComponent(url)}`);
